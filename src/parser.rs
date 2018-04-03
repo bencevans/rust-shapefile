@@ -1,6 +1,9 @@
-use nom::{be_u32,le_u32,le_f64};
+extern crate geo;
 
-#[derive(Clone,Debug,PartialEq)]
+use nom::{be_u32, le_f64, le_u32};
+use self::geo::Point;
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Header {
     pub file_code: u32,
     pub file_length: u32,
@@ -13,7 +16,7 @@ pub struct Header {
     pub bbox_z_min: f64,
     pub bbox_z_max: f64,
     pub bbox_m_min: f64,
-    pub bbox_m_max: f64
+    pub bbox_m_max: f64,
 }
 
 named!(pub header<Header>,
@@ -48,7 +51,7 @@ named!(pub header<Header>,
     )
 );
 
-#[derive(Clone,Debug,PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RecordHeader {
     pub record_number: u32,
     pub content_length: u32,
@@ -65,14 +68,37 @@ named!(pub record_header<RecordHeader>,
     )
 );
 
-#[allow(non_upper_case_globals)] 
+#[derive(Clone, Debug, PartialEq)]
+pub struct NullShape {
+    shape_type: u32,
+}
+
+named!(pub record_content_null<NullShape>,
+    do_parse!(
+        shape_type: le_u32 >>
+        (NullShape {
+            shape_type: shape_type
+        })
+    )
+);
+
+named!(pub record_content_point<Point<f64>>,
+    do_parse!(
+        shape_type: le_u32 >>
+        x: le_f64 >>
+        y: le_f64 >>
+        (Point::new(x, y))
+    )
+);
+
+#[allow(non_upper_case_globals)]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom::{IResult};
+    use nom::IResult;
 
-    const countries : &'static [u8] = include_bytes!("../assets/ne_110m_admin_0_countries.shp");
-    const places    : &'static [u8] = include_bytes!("../assets/ne_110m_populated_places.shp");
+    const countries: &'static [u8] = include_bytes!("../assets/ne_110m_admin_0_countries.shp");
+    const places: &'static [u8] = include_bytes!("../assets/ne_110m_populated_places.shp");
 
     #[test]
     fn headers() {
@@ -92,7 +118,7 @@ mod tests {
                     bbox_z_min: 0.0,
                     bbox_z_max: 0.0,
                     bbox_m_min: 0.0,
-                    bbox_m_max: 0.0
+                    bbox_m_max: 0.0,
                 }
             )
         );
@@ -112,7 +138,7 @@ mod tests {
                     bbox_z_min: 0.0,
                     bbox_z_max: 0.0,
                     bbox_m_min: 0.0,
-                    bbox_m_max: 0.0
+                    bbox_m_max: 0.0,
                 }
             )
         );
@@ -126,9 +152,27 @@ mod tests {
                 &b""[..],
                 RecordHeader {
                     record_number: 1,
-                    content_length: 576
+                    content_length: 576,
                 }
             )
-        )
+        );
+        assert_eq!(
+            record_header(&places[100..108]),
+            IResult::Done(
+                &b""[..],
+                RecordHeader {
+                    record_number: 1,
+                    content_length: 10,
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn record_content_points() {
+        assert_eq!(
+            record_content_point(&places[108..128]),
+            IResult::Done(&b""[..], Point::new(12.453386544971766, 41.903282179960115))
+        );
     }
 }

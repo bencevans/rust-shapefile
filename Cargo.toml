@@ -11,3 +11,4 @@ authors = [
 
 [dependencies]
 nom = "3.0"
+geo = "0.7.4"
